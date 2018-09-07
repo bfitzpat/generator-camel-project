@@ -49,13 +49,9 @@ module.exports = class extends Generator {
   writing() {
     app: {
       var userProps = this.props;
-      var platformDelimiter = ':';
-      if (process.platform === 'win32') 
-        platformDelimiter = ';';
 
-      var mainClass = 'org.jboss.fuse.wsdl2rest.impl.Main';  
-      var libDir = path.join(__dirname, 'lib');
-      var jarDir = path.join(libDir, 'wsdl2rest-impl.jar');
+      var targetDir = path.join(__dirname, 'target');
+      var jar = path.join(targetDir, 'wsdl2rest-impl-fatjar-0.1.1-SNAPSHOT.jar');
       var log4jDir = path.join(__dirname, 'config', 'logging.properties');
       var log4jDirStr = String(log4jDir);
       var log4jDirUrl = fileUrl(log4jDirStr);
@@ -63,9 +59,8 @@ module.exports = class extends Generator {
 
       // build the java command with classpath, class name, and the passed parameters
       var cmdString = 'java';
+      cmdString = cmdString + ' -jar ' + jar;
       cmdString = cmdString + ' -Dlog4j.configuration=' + log4jDirUrl;
-      cmdString = cmdString + ' -cp ' + jarDir + platformDelimiter + 
-        libDir + '\\*' + platformDelimiter + '. ' + mainClass;
       cmdString = cmdString + ' --wsdl ' + userProps.wsdl;
       cmdString = cmdString + ' --out ' + outPath;
 
