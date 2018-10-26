@@ -22,15 +22,42 @@ var helpers = require('yeoman-test');
 var basicProps = {};
 var fs = require('fs-extra');
 const utils = require('../app/util');
+const app_soap = require('./app_soap');
+
+
+var defaultCamel = '2.22.2';
 
 describe('generator-camel:app', function () {
+
+  describe('Should test the utils class package validation', function () {
+    it('utilities package validation should work for valid package', function () {
+      assert.strictEqual(utils.validatePackage('com.valid'), true);
+    });
+    it('utilities package validation should fail for package name with invalid characters', function () {
+      assert.notStrictEqual(utils.validatePackage('invalid@.pkg.name'), true);
+    });
+    it('utilities package validation should fail for package name with java keyword', function () {
+      assert.notStrictEqual(utils.validatePackage('a.name.with.package'), true);
+    });
+
+    it('utilities findWsdl2RestJar should succeed in finding wsdl2rest jar', function () {
+      // test runs on its own but fails in the larger test suite - still figuring that out
+      var targetDir = path.join(__dirname, '../app/wsdl2rest/target');
+      var jar = utils.findWsdl2RestJar(targetDir);
+      assert.notStrictEqual(jar, null);
+      console.log(`jar: ${jar}`);
+      assert.strictEqual(jar.includes('wsdl2rest-impl-fatjar-'), true);
+      assert.strictEqual(jar.endsWith('.jar'), true);
+      assert.notStrictEqual(jar.endsWith('.original'), true);
+    });
+  });
 
   describe('Should properly scaffold with default config for Spring', function () {
 
     before(function () {
       basicProps.name = 'MyAppMock';
       basicProps.package = 'com.generator.mock';
-      basicProps.camelVersion = '2.18.2';
+      basicProps.camelVersion = defaultCamel;
       basicProps.camelDSL = 'spring';
 
       return helpers.run(path.join(__dirname, '../app'))
@@ -49,6 +76,7 @@ describe('generator-camel:app', function () {
       assert.file('pom.xml');
       assert.file('README.md');
       assert.file('src/main/resources/META-INF/spring/camel-context.xml');
+      assert.noFile('pom.xml.wsdl2rest');
     });
 
     it('Should create pom.xml with default content', function () {
@@ -62,7 +90,7 @@ describe('generator-camel:app', function () {
     before(function () {
       basicProps.name = 'MyAppMockBP';
       basicProps.package = 'com.generator.mock.bp';
-      basicProps.camelVersion = '2.18.2';
+      basicProps.camelVersion = defaultCamel;
       basicProps.camelDSL = 'blueprint';
 
       return helpers.run(path.join(__dirname, '../app'))
@@ -81,6 +109,7 @@ describe('generator-camel:app', function () {
       assert.file('pom.xml');
       assert.file('README.md');
       assert.file('src/main/resources/OSGI-INF/blueprint/blueprint.xml');
+      assert.noFile('pom.xml.wsdl2rest');
     });
 
     it('Should create pom.xml with default content', function () {
@@ -94,7 +123,7 @@ describe('generator-camel:app', function () {
     before(function () {
       basicProps.name = 'MyAppMockJava';
       basicProps.package = 'com.generator.mock.javadsl';
-      basicProps.camelVersion = '2.18.2';
+      basicProps.camelVersion = defaultCamel;
       basicProps.camelDSL = 'java';
 
       return helpers.run(path.join(__dirname, '../app'))
@@ -114,6 +143,7 @@ describe('generator-camel:app', function () {
       assert.file('README.md');
       assert.file('src/main/java/com/generator/mock/javadsl/routes/CamelRoute.java');
       assert.file('src/main/java/com/generator/mock/javadsl/routes/Launcher.java');
+      assert.noFile('pom.xml.wsdl2rest');
     });
 
     it('Should create pom.xml with default content', function () {
@@ -127,7 +157,7 @@ describe('generator-camel:app', function () {
     before(function () {
       basicProps.name = 'MyAppMock2';
       basicProps.package = 'com.generator.mock2';
-      basicProps.camelVersion = '2.18.2';
+      basicProps.camelVersion = defaultCamel;
       basicProps.camelDSL = 'spring';
 
       var args = [];
@@ -149,6 +179,7 @@ describe('generator-camel:app', function () {
       assert.file('pom.xml');
       assert.file('README.md');
       assert.file('src/main/resources/META-INF/spring/camel-context.xml');
+      assert.noFile('pom.xml.wsdl2rest');
     });
 
     it('Should create pom.xml with default content', function () {
@@ -157,15 +188,149 @@ describe('generator-camel:app', function () {
     });
   });
 
-  describe('Should test the utils class package validation', function () {
-    it('utilities package validation should work for valid package', function () {
-      assert.strictEqual(utils.validatePackage('com.valid'), true);
+});
+
+describe('generator-camel:wsdl2rest', function () {
+  before(function () {
+    app_soap.startWebService();
+  });
+
+  after(function () {
+    app_soap.stopWebService();
+  });
+
+  describe('Should properly scaffold with wsdl2rest', function () {
+    it('Should create the basic structure and CXF files for spring', function () {
+      basicProps.name = 'MyAppMock';
+      basicProps.package = 'com.generator.mock';
+      basicProps.camelVersion = defaultCamel;
+      basicProps.camelDSL = 'spring';
+      var wsdlPath = path.join(__dirname, '../test/address.wsdl');
+      basicProps.wsdl = wsdlPath;
+      basicProps.outdirectory = 'src/main/java';
+      return helpers.run(path.join(__dirname, '../app'))
+        .inTmpDir(function (dir) {
+          var done = this.async(); // `this` is the RunContext object.
+          fs.copy(path.join(__dirname, '../templates'), dir, done);
+          basicProps.outdirectory = path.join(dir, 'src/main/java');
+        })
+        .withOptions({ wsdl2rest: true })
+        .withOptions({ debug: true })
+        .withPrompts({ name: basicProps.name })
+        .withPrompts({ camelVersion: basicProps.camelVersion })
+        .withPrompts({ camelDSL: basicProps.camelDSL })
+        .withPrompts({ package: basicProps.package })
+        .withPrompts({ wsdl: basicProps.wsdl })
+        .withPrompts({ outdirectory: basicProps.outdirectory })
+        .toPromise()
+        .then(() => {
+          assert.file('pom.xml');
+          assert.file('README.md');
+          assert.file('src/main/resources/META-INF/spring/camel-context.xml');
+          assert.file('src/main/java/org/jboss/fuse/wsdl2rest/test/doclit/Address.java');
+          assert.noFile('pom.xml.wsdl2rest');
+        });
     });
-    it('utilities package validation should fail for package name with invalid characters', function () {
-      assert.notStrictEqual(utils.validatePackage('invalid@.pkg.name'), true);
+
+    it('Should create the basic structure and CXF files for blueprint', function () {
+      basicProps.name = 'MyAppMock';
+      basicProps.package = 'com.generator.mock';
+      basicProps.camelVersion = defaultCamel;
+      basicProps.camelDSL = 'blueprint';
+      var wsdlPath = path.join(__dirname, '../test/address.wsdl');
+      basicProps.wsdl = wsdlPath;
+      basicProps.outdirectory = 'src/main/java';
+      return helpers.run(path.join(__dirname, '../app'))
+        .inTmpDir(function (dir) {
+          var done = this.async(); // `this` is the RunContext object.
+          fs.copy(path.join(__dirname, '../templates'), dir, done);
+          basicProps.outdirectory = path.join(dir, 'src/main/java');
+        })
+        .withOptions({ wsdl2rest: true })
+        .withPrompts({ name: basicProps.name })
+        .withPrompts({ camelVersion: basicProps.camelVersion })
+        .withPrompts({ camelDSL: basicProps.camelDSL })
+        .withPrompts({ package: basicProps.package })
+        .withPrompts({ wsdl: basicProps.wsdl })
+        .withPrompts({ outdirectory: basicProps.outdirectory })
+        .toPromise()
+        .then(() => {
+          assert.file('pom.xml');
+          assert.file('README.md');
+          assert.file('src/main/resources/OSGI-INF/blueprint/blueprint.xml');
+          assert.file('src/main/java/org/jboss/fuse/wsdl2rest/test/doclit/Address.java');
+          assert.noFile('pom.xml.wsdl2rest');
+        });
     });
-    it('utilities package validation should fail for package name with java keyword', function () {
-      assert.notStrictEqual(utils.validatePackage('a.name.with.package'), true);
+
+    it('Should create the basic structure and CXF files for spring with an internal running WSDL url', function () {
+
+      basicProps.name = 'HelloWorld';
+      basicProps.package = 'com.mock.hello';
+      basicProps.camelVersion = defaultCamel;
+      basicProps.camelDSL = 'spring';
+      basicProps.jaxwsURL = 'http://localhost:3000/helloworldservice';
+      basicProps.wsdl = 'http://localhost:3000/helloworldservice?wsdl';
+      basicProps.outdirectory = 'src/main/java';
+      return helpers.run(path.join(__dirname, '../app'))
+        .inTmpDir(function (dir) {
+          var done = this.async(); // `this` is the RunContext object.
+          fs.copy(path.join(__dirname, '../templates'), dir, done);
+          basicProps.outdirectory = path.join(dir, 'src/main/java');
+        })
+        .withOptions({ wsdl2rest: true })
+        .withPrompts({ name: basicProps.name })
+        .withPrompts({ camelVersion: basicProps.camelVersion })
+        .withPrompts({ camelDSL: basicProps.camelDSL })
+        .withPrompts({ package: basicProps.package })
+        .withPrompts({ wsdl: basicProps.wsdl })
+        .withPrompts({ outdirectory: basicProps.outdirectory })
+        .withPrompts({ jaxwsURL: basicProps.jaxwsURL })
+        .toPromise()
+        .then(() => {
+          assert.file('pom.xml');
+          assert.file('README.md');
+          assert.file('src/main/resources/META-INF/spring/camel-context.xml');
+          assert.noFile('pom.xml.wsdl2rest');
+        });
     });
+  });
+
+  it('Should create the basic structure and CXF files for spring with a sample wsdl and all required command line options', function () {
+    basicProps.name = 'Address2';
+    basicProps.package = 'com.mock.address2';
+    basicProps.camelVersion = defaultCamel;
+    basicProps.camelDSL = 'spring';
+    basicProps.jaxwsURL = 'http://localhost:9090/AddressPort';
+    basicProps.jaxrsURL = 'http://localhost:8081/rest';
+    var wsdlPath = path.join(__dirname, '../test/address.wsdl');
+    basicProps.wsdl = wsdlPath;
+    basicProps.outdirectory = 'src/main/java';
+
+    var args = [];
+    args.push("appname=" + basicProps.name);
+    args.push("camelVersion=" + basicProps.camelVersion);
+    args.push("camelDSL=" + basicProps.camelDSL);
+    args.push("package=" + basicProps.package);
+    args.push("wsdl=" + basicProps.wsdl);
+    args.push("outdirectory=" + basicProps.outdirectory);
+    args.push("jaxrs=" + basicProps.jaxrsURL);
+    args.push("jaxws=" + basicProps.jaxwsURL);
+
+    return helpers.run(path.join(__dirname, '../app'))
+      .inTmpDir(function (dir) {
+        var done = this.async(); // `this` is the RunContext object.
+        fs.copy(path.join(__dirname, '../templates'), dir, done);
+        basicProps.outdirectory = path.join(dir, 'src/main/java');
+      })
+      .withArguments(args)
+      .withOptions({ wsdl2rest: true })
+      .toPromise()
+      .then(() => {
+        assert.file('pom.xml');
+        assert.file('README.md');
+        assert.file('src/main/resources/META-INF/spring/camel-context.xml');
+        assert.noFile('pom.xml.wsdl2rest');
+      });
   });
 });
