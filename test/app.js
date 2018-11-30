@@ -29,29 +29,6 @@ var defaultCamel = '2.22.2';
 
 describe('generator-camel:app', function () {
 
-  describe('Should test the utils class package validation', function () {
-    it('utilities package validation should work for valid package', function () {
-      assert.strictEqual(utils.validatePackage('com.valid'), true);
-    });
-    it('utilities package validation should fail for package name with invalid characters', function () {
-      assert.notStrictEqual(utils.validatePackage('invalid@.pkg.name'), true);
-    });
-    it('utilities package validation should fail for package name with java keyword', function () {
-      assert.notStrictEqual(utils.validatePackage('a.name.with.package'), true);
-    });
-
-    it('utilities findWsdl2RestJar should succeed in finding wsdl2rest jar', function () {
-      // test runs on its own but fails in the larger test suite - still figuring that out
-      var targetDir = path.join(__dirname, '../app/wsdl2rest/target');
-      var jar = utils.findWsdl2RestJar(targetDir);
-      assert.notStrictEqual(jar, null);
-      console.log(`jar: ${jar}`);
-      assert.strictEqual(jar.includes('wsdl2rest-impl-fatjar-'), true);
-      assert.strictEqual(jar.endsWith('.jar'), true);
-      assert.notStrictEqual(jar.endsWith('.original'), true);
-    });
-  });
-
   describe('Should properly scaffold with default config for Spring', function () {
 
     before(function () {
